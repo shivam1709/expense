@@ -77,6 +77,45 @@ at http://localhost:4000 (or whatever `PORT` you set).
 Open the site in your phone's browser and choose "Add to Home Screen"
 (Safari) or "Install app" (Chrome). It'll behave like a native app icon.
 
+## Deploying so both of you can use it from anywhere
+
+Running it on one laptop only works on the same Wi-Fi. To reach it from your
+phones anywhere (mobile data included), deploy it to [Fly.io](https://fly.io) —
+it has a free-tier VM plus a persistent volume, which this repo is already
+set up for (`Dockerfile` + `fly.toml`).
+
+1. **Install the Fly CLI and sign up:**
+   ```bash
+   curl -L https://fly.io/install.sh | sh
+   fly auth signup   # or `fly auth login` if you already have an account
+   ```
+   Fly's free allowance still requires a card on file for verification.
+
+2. **Pick a unique app name** and put it in `fly.toml` (Fly app names are
+   global — `our-expenses-changeme` is just a placeholder):
+   ```bash
+   sed -i '' 's/our-expenses-changeme/your-unique-name-here/' fly.toml   # macOS
+   # or: sed -i 's/our-expenses-changeme/your-unique-name-here/' fly.toml   # Linux
+   ```
+
+3. **Create the app, volume, and secret, then deploy:**
+   ```bash
+   fly apps create your-unique-name-here
+   fly volumes create expense_data --size 1 --region iad
+   fly secrets set JWT_SECRET="$(openssl rand -hex 32)"
+   fly deploy
+   ```
+
+4. **Open it:**
+   ```bash
+   fly open
+   ```
+   You'll land on the same setup screen — create your two accounts, then add
+   the `https://your-unique-name-here.fly.dev` URL to both your home screens.
+
+Your SQLite data lives on the Fly volume and survives redeploys and restarts.
+To ship a future update, just run `fly deploy` again from the repo root.
+
 ## Data
 
 All data lives in a local SQLite file at `server/data/expense.db`. Back it
