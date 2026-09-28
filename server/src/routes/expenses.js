@@ -191,6 +191,7 @@ router.get('/stats/summary', (req, res) => {
     .prepare(`SELECT SUM(amount) as total, COUNT(*) as count FROM expenses WHERE strftime('%Y-%m', date) = ?`)
     .get(month);
 
+  // "Who fronted the cash" — useful for settle-up context.
   const byPayer = db
     .prepare(
       `SELECT u.id as userId, u.name, u.color, SUM(e.amount) as total
@@ -199,6 +200,33 @@ router.get('/stats/summary', (req, res) => {
        GROUP BY u.id`
     )
     .all(month);
+
+  // "Who actually spent it" — a shared expense's cost is split between both people
+  // according to its split, regardless of who paid the bill upfront.
+  const users = db.prepare('SELECT id, name, color FROM users ORDER BY id ASC').all();
+  const monthExpenses = db
+    .prepare(
+      `SELECT amount, paid_by, is_shared, split_payer_share FROM expenses WHERE strftime('%Y-%m', date) = ?`
+    )
+    .all(month);
+  const personTotals = new Map(users.map((u) => [u.id, 0]));
+  for (const e of monthExpenses) {
+    if (!e.is_shared) {
+      personTotals.set(e.paid_by, (personTotals.get(e.paid_by) || 0) + e.amount);
+      continue;
+    }
+    const otherUser = users.find((u) => u.id !== e.paid_by);
+    const payerShare = e.amount * (e.split_payer_share / 100);
+    const otherShare = e.amount - payerShare;
+    personTotals.set(e.paid_by, (personTotals.get(e.paid_by) || 0) + payerShare);
+    if (otherUser) personTotals.set(otherUser.id, (personTotals.get(otherUser.id) || 0) + otherShare);
+  }
+  const byPerson = users.map((u) => ({
+    userId: u.id,
+    name: u.name,
+    color: u.color,
+    total: Math.round((personTotals.get(u.id) || 0) * 100) / 100,
+  }));
 
   const prevMonth = shiftMonth(month, -1);
   const prevTotalRow = db
@@ -211,6 +239,7 @@ router.get('/stats/summary', (req, res) => {
     count: totalRow.count || 0,
     categories: rows,
     byPayer,
+    byPerson,
     previousMonthTotal: prevTotalRow.total || 0,
   });
 });

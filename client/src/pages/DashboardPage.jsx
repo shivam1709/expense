@@ -93,6 +93,15 @@ export default function DashboardPage() {
         )}
       </div>
 
+      <div className="card p-4">
+        <h2 className="font-semibold mb-3">Spending by person</h2>
+        {!summary.byPerson?.some((p) => p.total > 0) ? (
+          <EmptyState text="No expenses logged this month yet." />
+        ) : (
+          <PersonSplit byPerson={summary.byPerson} total={summary.total} />
+        )}
+      </div>
+
       {budgets.length > 0 && (
         <div className="card p-4">
           <div className="flex items-center justify-between mb-3">
@@ -213,6 +222,41 @@ function CategoryPie({ categories, total }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function PersonSplit({ byPerson, total }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        {byPerson.map((p) => (
+          <div key={p.userId}>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+              <span className="text-sm truncate">{p.name}</span>
+            </div>
+            <p className="text-xl font-bold">{formatCurrency(p.total)}</p>
+            <p className="text-xs text-slate-400">
+              {total > 0 ? Math.round((p.total / total) * 100) : 0}% of household spend
+            </p>
+          </div>
+        ))}
+      </div>
+      <div className="h-2.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
+        {byPerson.map((p) => (
+          <div
+            key={p.userId}
+            style={{
+              width: `${total > 0 ? (p.total / total) * 100 : 100 / byPerson.length}%`,
+              backgroundColor: p.color,
+            }}
+          />
+        ))}
+      </div>
+      <p className="text-xs text-slate-400">
+        Includes your full share of any split expenses, not just what you personally paid upfront.
+      </p>
     </div>
   );
 }
